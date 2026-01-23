@@ -1,7 +1,32 @@
 import numpy as np
 import pandas as pd
-import mne
 import matplotlib.pyplot as plt
+import mne
+
+
+class Preprocessing():
+    def __init__(self, sub_id, movie_order, start_time, bad_channels, cuts, detect_muscle_ics=False, report=True):
+        self.sub_id = sub_id
+        self.movie_order = movie_order
+        self.start_time = start_time
+        self.bad_channels = bad_channels
+        self.cuts = cuts
+        self.detect_muscle_ics = detect_muscle_ics
+        self.report = report
+
+    def run(self):
+        raw, file_name = load_eeg(self.sub_id, self.movie_order)
+        raw = crop_offset(raw, self.start_time, file_name)
+        set_montage(raw)
+        line_ratio = bandpass_and_notch(raw)
+        mark_bads(raw, self.bad_channels)
+        raw_ica = run_ica(raw, file_name, detect_muscle_ics=self.detect_muscle_ics, report=self.report)
+        epochs_clean = epoch_and_reject(raw_ica, self.cuts)
+        if epochs_clean.info['bads']:
+            epochs_clean.interpolate_bads()
+        epochs_clean.set_eeg_reference('average', projection=False)
+        epochs_clean.apply_baseline((-0.2, 0))
+        return epochs_clean, line_ratio
 
 
 def load_eeg(sub_id, movie_order):
@@ -9,14 +34,10 @@ def load_eeg(sub_id, movie_order):
     file_name = f'sub{sub_id}_{movie_order}'
     eeg_path = f'data/eeg/{file_name}.edf'
     raw = mne.io.read_raw_edf(eeg_path, preload=True)
-    return raw, file_name
+    return raw
 
-def crop_offset(raw, file_name):
+def crop_offset(raw, start_time):
     """Crop the raw data based on film start offsets."""
-    offset = pd.read_csv('data/film_start.csv')
-    idx = file_name + '.bdf'
-    start_time = offset.set_index('file').loc[idx, 'film_start']
-
     # sanity check before cutting the offset 
     status_ch_events = mne.find_events(raw, stim_channel="Status")
 
@@ -31,6 +52,14 @@ def crop_offset(raw, file_name):
 def set_montage(raw, montage='standard_1020'):
     mon = mne.channels.make_standard_montage(montage)
     raw.set_montage(mon)
+
+def bandpass_and_notch(raw, l_freq=1., h_freq=50., notch_freqs=[50.]):
+    raw.filter(l_freq, h_freq, picks=["eeg"])
+    if notch_freqs:
+        raw.notch_filter(notch_freqs, notch_widths=0.02, method="fir", picks="eeg")
+        line_ratio = _calculate_line_ratio(raw)
+    return line_ratio
+
 
 def mark_bads(raw, bads):
     if isinstance(bads, float) and np.isnan(bads):
@@ -146,14 +175,9 @@ def _create_ica_report(raw, ica, df_scores, file_name):
 
     report.save(f"data/reports/{file_name}_ica_report.html", overwrite=True)
 
-def epoch_and_reject(cut_dirs_path, raw):
-    cuts_art_l = pd.read_csv(cut_dirs_path)  # epoch the data based on the cuts
-    cuts_art_l = cuts_art_l[cuts_art_l['Time'] >= 0]  # Drop sentinel (-1), keep real cuts (including 0)
-    if cut_dirs_path.stem.__contains__('city_nl'):
-        cuts_art_l = cuts_art_l.drop_duplicates('Time')
-
+def epoch_and_reject(raw, cuts):
     events = []
-    for _, row in cuts_art_l.iterrows():
+    for _, row in cuts.iterrows():
         sample = row['Time']
         events.append([int(sample * raw.info['sfreq']+ raw.first_samp), 0, 1])  # first sample is in fact equal to start_time * sampling_rate
     events = np.array(events, dtype=int)
