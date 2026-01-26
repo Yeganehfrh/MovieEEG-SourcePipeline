@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -7,7 +8,7 @@ import mne
 
 class Preprocessing():
     def __init__(self, eeg_path, start_time,
-                 bad_channels, cuts, detect_muscle_ics=False, report=True):
+                 bad_channels, cuts, detect_muscle_ics=False, report=True, report_path=Path('data/reports/')):
         self.eeg_path = eeg_path
         self.file_name = eeg_path.stem
         self.start_time = start_time
@@ -15,6 +16,8 @@ class Preprocessing():
         self.cuts = cuts
         self.detect_muscle_ics = detect_muscle_ics
         self.report = report
+        self.report_path = report_path
+        report_path.mkdir(parents=True, exist_ok=True)
 
     def run(self):
         raw = mne.io.read_raw_edf(self.eeg_path, preload=True)
@@ -22,7 +25,11 @@ class Preprocessing():
         set_montage(raw)
         line_ratio = bandpass_and_notch(raw)
         mark_bads(raw, self.bad_channels)
-        raw_ica = run_ica(raw, self.file_name, detect_muscle_ics=self.detect_muscle_ics, report=self.report)
+        raw_ica = run_ica(raw,
+                          self.file_name,
+                          self.report_path,
+                          detect_muscle_ics=self.detect_muscle_ics,
+                          report=self.report)
         epochs_clean = epoch_and_reject(raw_ica, self.cuts)
         if epochs_clean.info['bads']:
             epochs_clean.interpolate_bads()
@@ -71,7 +78,7 @@ def mark_bads(raw, bads):
     else:
         raise ValueError(f"Unexpected bad_channels entry: {bads}")
 
-def run_ica(raw, file_name, detect_muscle_ics=False, report=True):
+def run_ica(raw, file_name, report_path, detect_muscle_ics=False, report=True):
     # Vertical EOG proxy: Fp1 - Cz
     raw = mne.set_bipolar_reference(raw, "Fp1", "Cz", ch_name="VEOG", drop_refs=False)
     raw.set_channel_types({"VEOG": "eog"})
@@ -112,11 +119,11 @@ def run_ica(raw, file_name, detect_muscle_ics=False, report=True):
         if len(muscle_scores):
             df_scores["Muscle_score"] = muscle_scores
 
-        _create_ica_report(raw_filt, ica, df_scores, file_name)
+        _create_ica_report(raw_filt, ica, df_scores, file_name, report_path)
 
     return raw_ica
 
-def _create_ica_report(raw, ica, df_scores, file_name):
+def _create_ica_report(raw, ica, df_scores, file_name, report_path):
     report = mne.Report(title=f"ICA report – {file_name}")
 
     report.add_ica(
@@ -176,7 +183,7 @@ def _create_ica_report(raw, ica, df_scores, file_name):
     plt.close(fig)
 
     report.save(
-        f"data/reports/{file_name}_ica_report.html",
+        report_path / f"{file_name}_ica_report.html",
         overwrite=True,
         open_browser=False
     )
@@ -192,7 +199,7 @@ def epoch_and_reject(raw, cuts):
     epochs_clean = mne.Epochs(raw,
                         events,
                         event_id={'cuts': 1},
-                        tmin=-0.2,
+                        tmin=-0.200,
                         tmax=1,
                         baseline=None, # no baseline correction for now
                         preload=True,
