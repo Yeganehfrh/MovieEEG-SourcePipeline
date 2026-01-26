@@ -1,3 +1,4 @@
+import re
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -5,9 +6,10 @@ import mne
 
 
 class Preprocessing():
-    def __init__(self, sub_id, movie_order, start_time, bad_channels, cuts, detect_muscle_ics=False, report=True):
-        self.sub_id = sub_id
-        self.movie_order = movie_order
+    def __init__(self, eeg_path, start_time,
+                 bad_channels, cuts, detect_muscle_ics=False, report=True):
+        self.eeg_path = eeg_path
+        self.file_name = eeg_path.stem
         self.start_time = start_time
         self.bad_channels = bad_channels
         self.cuts = cuts
@@ -15,12 +17,12 @@ class Preprocessing():
         self.report = report
 
     def run(self):
-        raw, file_name = load_eeg(self.sub_id, self.movie_order)
-        raw = crop_offset(raw, self.start_time, file_name)
+        raw = mne.io.read_raw_edf(self.eeg_path, preload=True)
+        raw = crop_offset(raw, self.start_time)
         set_montage(raw)
         line_ratio = bandpass_and_notch(raw)
         mark_bads(raw, self.bad_channels)
-        raw_ica = run_ica(raw, file_name, detect_muscle_ics=self.detect_muscle_ics, report=self.report)
+        raw_ica = run_ica(raw, self.file_name, detect_muscle_ics=self.detect_muscle_ics, report=self.report)
         epochs_clean = epoch_and_reject(raw_ica, self.cuts)
         if epochs_clean.info['bads']:
             epochs_clean.interpolate_bads()
@@ -28,13 +30,6 @@ class Preprocessing():
         epochs_clean.apply_baseline((-0.2, 0))
         return epochs_clean, line_ratio
 
-
-def load_eeg(sub_id, movie_order):
-    """Load raw EEG data for a given subject and movie order."""
-    file_name = f'sub{sub_id}_{movie_order}'
-    eeg_path = f'data/eeg/{file_name}.edf'
-    raw = mne.io.read_raw_edf(eeg_path, preload=True)
-    return raw
 
 def crop_offset(raw, start_time):
     """Crop the raw data based on film start offsets."""
@@ -92,7 +87,7 @@ def run_ica(raw, file_name, detect_muscle_ics=False, report=True):
 
     eog_inds_v, scores_v = ica.find_bads_eog(raw, ch_name="VEOG")
     eog_inds_h, scores_h = ica.find_bads_eog(raw, ch_name="HEOG")
-    muscle_inds = []
+    muscle_inds, muscle_scores = [], []
     if detect_muscle_ics:
         muscle_inds, muscle_scores = ica.find_bads_muscle(raw)
         muscle_inds = [i for i in muscle_inds if abs(muscle_scores[i]) > 0.9]
@@ -106,18 +101,18 @@ def run_ica(raw, file_name, detect_muscle_ics=False, report=True):
     raw_ica = ica.apply(raw.copy())
     raw_ica.drop_channels(['VEOG', 'HEOG'])
 
-    if report:
-        if report:
-            # add table and a bar plot of scores to the report
-            df_scores = pd.DataFrame({
-                "IC": np.arange(ica.n_components_),
-                "EOG_V_score": scores_v,
-                "EOG_H_score": scores_h,
-            })
-            if len(muscle_scores):
-                df_scores["Muscle_score"] = muscle_scores
 
-            _create_ica_report(raw_filt, ica, df_scores, file_name)
+    if report:
+        # add table and a bar plot of scores to the report
+        df_scores = pd.DataFrame({
+            "IC": np.arange(ica.n_components_),
+            "EOG_V_score": scores_v,
+            "EOG_H_score": scores_h,
+        })
+        if len(muscle_scores):
+            df_scores["Muscle_score"] = muscle_scores
+
+        _create_ica_report(raw_filt, ica, df_scores, file_name)
 
     return raw_ica
 
@@ -132,15 +127,20 @@ def _create_ica_report(raw, ica, df_scores, file_name):
         n_jobs=1
     )
 
-    report.add_figure(
-        ica.plot_components(show=False),
-        title="All IC topographies"
-    )
+    figs = ica.plot_components(show=False)
+    report.add_figure(figs, title="All IC topographies")
+    if isinstance(figs, (list, tuple)):
+        for fig in figs:
+            if isinstance(fig, plt.Figure):
+                plt.close(fig)
+    else:
+        if isinstance(figs, plt.Figure):
+            plt.close(figs)
 
-    report.add_figure(
-        ica.plot_sources(raw, show=False),
-        title="IC time courses"
-    )
+    fig_sources = ica.plot_sources(raw, show=False)
+    report.add_figure(fig_sources, title="IC time courses")
+    if isinstance(fig_sources, plt.Figure):
+        plt.close(fig_sources)
 
     html = df_scores.to_html(index=False, float_format="%.3f")
 
@@ -161,6 +161,7 @@ def _create_ica_report(raw, ica, df_scores, file_name):
     ax.set_ylabel("Correlation")
     ax.legend()
     report.add_figure(fig, title="EOG–IC correlation scores")
+    plt.close(fig)
 
     fig, ax = plt.subplots(1, len(df_scores.columns)-1, figsize=(20, 4))
     ax[0].hist(df_scores["EOG_V_score"], label="VEOG")
@@ -172,8 +173,13 @@ def _create_ica_report(raw, ica, df_scores, file_name):
         ax[2].set_title("Muscle Scores")
 
     report.add_figure(fig, title="Distribution of Scores")
+    plt.close(fig)
 
-    report.save(f"data/reports/{file_name}_ica_report.html", overwrite=True)
+    report.save(
+        f"data/reports/{file_name}_ica_report.html",
+        overwrite=True,
+        open_browser=False
+    )
 
 def epoch_and_reject(raw, cuts):
     events = []
