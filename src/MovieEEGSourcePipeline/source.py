@@ -37,7 +37,6 @@ def make_forward(example_epochs_fpath: Path, FS_SUBJECT, FS_SRC_FNAME, FS_BEM_FN
         bem=bem,
         eeg=True,
         mindist=5.0,
-        n_jobs=-1,
         verbose=False,
     )
     return fwd
@@ -89,7 +88,6 @@ def extract_label_time_series(
         lambda2=1.0 / 9.0,
         pick_ori="normal",     # explicit orientation choice
         return_generator=False,
-        n_jobs=n_jobs,
         verbose=False,
     )
 
@@ -99,7 +97,6 @@ def extract_label_time_series(
         src=inv["src"],
         mode="pca_flip",       # avoids sign cancellation; good for connectivity/ERP
         return_generator=False,
-        n_jobs=n_jobs,
         verbose=False,
     )
     # label_ts: (n_epochs, n_labels, n_times)
