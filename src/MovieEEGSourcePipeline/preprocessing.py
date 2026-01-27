@@ -33,7 +33,7 @@ class Preprocessing():
         epochs_clean = epoch_and_reject(raw_ica, self.cuts)
         if epochs_clean.info['bads']:
             epochs_clean.interpolate_bads()
-        epochs_clean.set_eeg_reference('average', projection=False)
+        epochs_clean.set_eeg_reference('average', projection=True)  # not applying the projection yet, it will be applied later during source estimation
         epochs_clean.apply_baseline((-0.2, 0))
         return epochs_clean, line_ratio
 
