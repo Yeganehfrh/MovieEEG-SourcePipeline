@@ -1,4 +1,5 @@
 from pathlib import Path
+import time
 import os
 import re
 import numpy as np
@@ -16,7 +17,7 @@ def run_source_localisation(subject_dir, data_dir, fs_subject, fs_src_fname, fs_
     )
 
     # Pick a single example file to define channel set for forward model
-    example = next(data_dir.glob("*_art_nl_epo.fif"))
+    example = next(data_dir.glob("*_city_l_epo.fif"))
     fwd = make_forward(example, FS_SUBJECT=fs_subject, FS_SRC_FNAME=fs_src_fname, FS_BEM_FNAME=fs_bem_fname)
 
     inv_cache = {}  # subject -> inverse operator built from baseline1
@@ -61,6 +62,11 @@ if __name__ == '__main__':
     os.environ["SUBJECTS_DIR"] = str(SUBJECTS_DIR)  # a temporary solution to make sure mne can find SUBJECTS_DIR
 
     n_jobs = int(os.environ.get("MNE_NUM_JOBS", "-1"))
+    print(f'core numbers are {n_jobs}')
+
+    start = time.time()
+    print(f'Start time: {start}')
+
     run_source_localisation(
         subject_dir=SUBJECTS_DIR,
         data_dir=DATA_DIR,
@@ -69,3 +75,6 @@ if __name__ == '__main__':
         fs_bem_fname=FS_BEM_FNAME,
         n_jobs=n_jobs,
     )
+    
+    end = time.time()
+    print(f'Elapsed: {end - start:.2f} seconds')
