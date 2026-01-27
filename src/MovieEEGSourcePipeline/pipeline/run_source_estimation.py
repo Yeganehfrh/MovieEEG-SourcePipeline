@@ -33,8 +33,8 @@ def run_source_localisation(subject_dir, data_dir, fs_subject, fs_src_fname, fs_
         out_dir.mkdir(parents=True, exist_ok=True)
         output_path_labels = out_dir / f"{subject}_{film}_labels.npz"
 
-        if output_path_labels.exists():
-            continue
+        # if output_path_labels.exists():
+        #     continue
 
         # Ensure we have an inverse per subject (from baseline1)
         if subject not in inv_cache:
