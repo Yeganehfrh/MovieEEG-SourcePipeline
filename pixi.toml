@@ -1,0 +1,14 @@
+[workspace]
+authors = ["Yeganeh Farahzadi <36996819+Yeganehfrh@users.noreply.github.com>"]
+channels = ["conda-forge"]
+name = "MovieEEG-SourcePipeline"
+platforms = ["osx-arm64", "linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+python = ">=3.13.11,<3.14"
+mne = ">=1.11.0,<2"
+seaborn = ">=0.13.2,<0.14"
+pandas = ">=3.0.0,<4"
