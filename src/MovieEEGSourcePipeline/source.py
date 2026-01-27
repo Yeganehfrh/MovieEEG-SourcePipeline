@@ -5,7 +5,7 @@ import mne
 
 # Forward / Inverse builders
 # -----------------------------
-def _load_epochs(fname: Path, sfreq) -> mne.Epochs:
+def _load_epochs(fname: Path, sfreq=512) -> mne.Epochs:
     epochs = mne.read_epochs(fname, preload=True, verbose=False)
 
     # Resample only if needed (to increase the computation speed)
@@ -17,12 +17,12 @@ def _load_epochs(fname: Path, sfreq) -> mne.Epochs:
     return epochs
 
 
-def make_forward(example_epochs_fname: Path, FS_SUBJECT, FS_SRC_FNAME, FS_BEM_FNAME) -> mne.Forward:
+def make_forward(example_epochs_fpath: Path, FS_SUBJECT, FS_SRC_FNAME, FS_BEM_FNAME) -> mne.Forward:
     """
     Build a single fsaverage forward solution to reuse across all subjects.
     Uses an example epochs file to define channel set and measurement info.
     """
-    epochs = _load_epochs(example_epochs_fname)
+    epochs = _load_epochs(example_epochs_fpath)
 
     # fsaverage transform (built-in)
     trans = FS_SUBJECT
@@ -76,6 +76,7 @@ def extract_label_time_series(
     epochs: mne.Epochs,
     inv: mne.minimum_norm.InverseOperator,
     atlas_labels: list,
+    n_jobs: int | None = None,
 ) -> np.ndarray:
     """
     Apply inverse on cut-locked epochs and extract parcel time courses.
@@ -88,6 +89,7 @@ def extract_label_time_series(
         lambda2=1.0 / 9.0,
         pick_ori="normal",     # explicit orientation choice
         return_generator=False,
+        n_jobs=n_jobs,
         verbose=False,
     )
 
@@ -97,6 +99,7 @@ def extract_label_time_series(
         src=inv["src"],
         mode="pca_flip",       # avoids sign cancellation; good for connectivity/ERP
         return_generator=False,
+        n_jobs=n_jobs,
         verbose=False,
     )
     # label_ts: (n_epochs, n_labels, n_times)
