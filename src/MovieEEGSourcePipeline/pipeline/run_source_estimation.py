@@ -1,4 +1,5 @@
 from pathlib import Path
+import joblib
 import time
 import os
 import re
@@ -62,7 +63,7 @@ if __name__ == '__main__':
     os.environ["SUBJECTS_DIR"] = str(SUBJECTS_DIR)  # a temporary solution to make sure mne can find SUBJECTS_DIR
 
     n_jobs = int(os.environ.get("MNE_NUM_JOBS", "-1"))
-    print(f'core numbers are {n_jobs}')
+    print(f'core numbers are {joblib.effective_n_jobs(n_jobs)}')
 
     start = time.time()
     print(f'Start time: {start}')
