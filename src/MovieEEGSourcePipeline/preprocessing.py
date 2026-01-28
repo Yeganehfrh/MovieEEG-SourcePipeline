@@ -1,10 +1,16 @@
 import re
+import logging
 from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import mne
 
+logger = logging.getLogger(__name__)
+
+
+class StatusOffsetError(RuntimeError):
+    pass
 
 class Preprocessing():
     def __init__(self, eeg_path, start_time,
@@ -43,11 +49,19 @@ def crop_offset(raw, start_time):
     # sanity check before cutting the offset 
     status_ch_events = mne.find_events(raw, stim_channel="Status")
 
+    if len(status_ch_events) < 2:
+        raise StatusOffsetError(
+            f"Status channel has <2 events for {raw.filenames[0] if raw.filenames else 'unknown file'}"
+        )
+
     if status_ch_events[1, 0] == start_time * raw.info['sfreq']:  # the timing of the second event in the satus channel should corresponds to the movie start (where we cut the data)
         print('The offset is compatible with Status channel')
         raw.crop(tmin=start_time)
     else:
-        ValueError('!!!The offset is NOT compatible with Status channel... DID NOT CROP!!!')
+        raise StatusOffsetError(
+            f"Status channel offset mismatch for {raw.filenames[0] if raw.filenames else 'unknown file'} "
+            f"(expected {start_time * raw.info['sfreq']} samples)"
+        )
     
     return raw
 

@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from src.MovieEEGSourcePipeline.preprocessing import Preprocessing
+from src.MovieEEGSourcePipeline.preprocessing import Preprocessing, StatusOffsetError
 
 os.environ["MNE_BROWSER_BACKEND"] = "matplotlib"
 
@@ -52,6 +52,9 @@ def run_preprocessing_pipeline(cut_path, bad_channels_path, start_time_path, eeg
             logger.info(f"Subject {sub_id}, Movie {movie}, Line Noise IC Ratio: {line_ratio}")
 
             print(f"Subject {sub_id} processed successfully.")
+        except StatusOffsetError as e:
+            logger.warning(f"Skipping subject {sub_id} due to Status channel issue: {e}")
+            print(f"Skipping subject {sub_id} due to Status channel issue. Check log for details.")
         except Exception as e:
             logger.error(f"Error processing subject {sub_id}: {e}")
             print(f"Error processing subject {sub_id}. Check log for details.")
