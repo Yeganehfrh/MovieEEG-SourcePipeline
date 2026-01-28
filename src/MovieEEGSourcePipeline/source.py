@@ -1,4 +1,5 @@
 from pathlib import Path
+from joblib import Parallel, delayed
 
 import numpy as np
 import mne
@@ -75,7 +76,7 @@ def extract_label_time_series(
     epochs: mne.Epochs,
     inv: mne.minimum_norm.InverseOperator,
     atlas_labels: list,
-    n_jobs: int | None = None,
+    n_jobs: int | None = -1,
 ) -> np.ndarray:
     """
     Apply inverse on cut-locked epochs and extract parcel time courses.
@@ -91,13 +92,20 @@ def extract_label_time_series(
         verbose=False,
     )
 
-    label_ts = mne.extract_label_time_course(
-        stcs,
-        labels=atlas_labels,
-        src=inv["src"],
-        mode="pca_flip",       # avoids sign cancellation; good for connectivity/ERP
-        return_generator=False,
-        verbose=False,
+    src = inv["src"]
+
+    def label_one(stc):
+        return mne.extract_label_time_course(
+            stc,
+            labels=atlas_labels,
+            src=src,
+            mode="pca_flip",       # avoids sign cancellation; good for connectivity/ERP
+            return_generator=False,
+            verbose=False
+        )
+    
+    label_ts = Parallel(n_jobs=n_jobs)(
+        delayed(label_one)(stc) for stc in stcs
     )
-    # label_ts: (n_epochs, n_labels, n_times)
-    return label_ts
+
+    return np.stack(label_ts, axis=0)  #(n_epochs, n_labels, n_times)
