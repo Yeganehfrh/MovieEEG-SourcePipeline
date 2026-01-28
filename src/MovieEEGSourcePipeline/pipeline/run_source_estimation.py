@@ -3,9 +3,12 @@ import joblib
 import time
 import os
 import re
+import logging
 import numpy as np
 import mne
 from src.MovieEEGSourcePipeline.source import _load_epochs, make_forward, make_inverse_from_baseline, extract_label_time_series
+
+logger = logging.getLogger(__name__)
 
 
 def run_source_localisation(subject_dir, data_dir, fs_subject, fs_src_fname, fs_bem_fname, n_jobs=None):
@@ -18,7 +21,11 @@ def run_source_localisation(subject_dir, data_dir, fs_subject, fs_src_fname, fs_
     )
 
     # Pick a single example file to define channel set for forward model
-    example = next(data_dir.glob("*_city_l_epo.fif"))
+    example = next(data_dir.glob("*_city_l_epo.fif"), None)
+    if example is None:
+        example = next(data_dir.glob("*_epo.fif"), None)
+    if example is None:
+        raise FileNotFoundError(f"No epoch files found in {data_dir} to build forward model.")
     fwd = make_forward(example, FS_SUBJECT=fs_subject, FS_SRC_FNAME=fs_src_fname, FS_BEM_FNAME=fs_bem_fname)
 
     inv_cache = {}  # subject -> inverse operator built from baseline1
@@ -28,29 +35,38 @@ def run_source_localisation(subject_dir, data_dir, fs_subject, fs_src_fname, fs_
         if m is None:
             continue
         subject, film = m.groups()
-        epochs = _load_epochs(epochs_path)
+        try:
+            epochs = _load_epochs(epochs_path)
 
-        out_dir = Path("data/labels")
-        out_dir.mkdir(parents=True, exist_ok=True)
-        output_path_labels = out_dir / f"{subject}_{film}_labels.npz"
+            out_dir = Path("data/labels")
+            out_dir.mkdir(parents=True, exist_ok=True)
+            output_path_labels = out_dir / f"{subject}_{film}_labels.npz"
 
-        # if output_path_labels.exists():
-        #     continue
+            if output_path_labels.exists():
+                continue
 
-        # Ensure we have an inverse per subject (from baseline1)
-        if subject not in inv_cache:
-            # pick baseline portion (and avoid immediate pre-cut because of anticipatory activity)
-            epochs_base = epochs.copy().crop(tmin=-0.2, tmax=-0.05)
-            inv_cache[subject] = make_inverse_from_baseline(epochs_base, fwd)
+            # Ensure we have an inverse per subject (from baseline1)
+            if subject not in inv_cache:
+                # pick baseline portion (and avoid immediate pre-cut because of anticipatory activity)
+                epochs_base = epochs.copy().crop(tmin=-0.2, tmax=-0.05)
+                inv_cache[subject] = make_inverse_from_baseline(epochs_base, fwd)
 
-        inv = inv_cache[subject]
+            inv = inv_cache[subject]
 
-        print(f">>>>>>>> {subject} {film}")
-        label_ts = extract_label_time_series(epochs, inv, atlas_labels, n_jobs=n_jobs)
-        np.savez_compressed(output_path_labels, labels=label_ts)
+            print(f">>>>>>>> {subject} {film}")
+            label_ts = extract_label_time_series(epochs, inv, atlas_labels, n_jobs=n_jobs)
+            np.savez_compressed(output_path_labels, labels=label_ts)
+        except Exception as e:
+            logger.error(f"Error processing {subject}_{film} from {epochs_path.name}: {e}")
+            print(f"Skipping {subject}_{film}. Check log for details.")
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        filename="source_estimation.log",
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(message)s",
+    )
     # Config
     DATA_DIR = Path("data/epochs")
     SUBJECTS_DIR = Path("data")          # contains fsaverage/ (i.e., data/fsaverage)
