@@ -1,13 +1,13 @@
 #!/bin/sh
 
-#SBATCH --job-name=Source_Localisation
+#SBATCH --job-name=Preprocessing
 #SBATCH --chdir=/mnt/aiongpfs/users/mansarinia/MovieEEG-SourcePipeline
 #SBATCH --partition=batch
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --time=1:00:00
-#SBATCH --output=/mnt/aiongpfs/users/mansarinia/MovieEEG-SourcePipeline/logs/SL_%j.log
-#SBATCH --error=/mnt/aiongpfs/users/mansarinia/MovieEEG-SourcePipeline/logs/SL_%j.log
+#SBATCH --output=/mnt/aiongpfs/users/mansarinia/MovieEEG-SourcePipeline/logs/preprocess_%j.log
+#SBATCH --error=/mnt/aiongpfs/users/mansarinia/MovieEEG-SourcePipeline/logs/preprocess_%j.log
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=y.farahzadi@gmail.com
 
