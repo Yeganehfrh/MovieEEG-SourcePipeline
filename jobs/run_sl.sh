@@ -6,8 +6,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=15:00:00
-#SBATCH --mem=16G
+#SBATCH --time=1:30:00
+#SBATCH --mem=20G
 #SBATCH --output=/mnt/aiongpfs/users/mansarinia/MovieEEG-SourcePipeline/logs/SL_%j.log
 #SBATCH --error=/mnt/aiongpfs/users/mansarinia/MovieEEG-SourcePipeline/logs/SL_%j.log
 #SBATCH --mail-type=ALL
