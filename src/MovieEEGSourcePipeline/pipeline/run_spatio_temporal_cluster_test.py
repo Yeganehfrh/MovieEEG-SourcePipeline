@@ -1,12 +1,12 @@
 import os
 import gc
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
-os.environ["OPENBLAS_NUM_THREADS"] = "1"
-os.environ["NUMEXPR_NUM_THREADS"] = "1"
+# os.environ["OMP_NUM_THREADS"] = "1"
+# os.environ["MKL_NUM_THREADS"] = "1"
+# os.environ["OPENBLAS_NUM_THREADS"] = "1"
+# os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
 from pathlib import Path
-from joblib import parallel_backend
+# from joblib import parallel_backend
 
 import numpy as np
 import mne
@@ -72,8 +72,8 @@ if __name__ == "__main__":
         # MNE expects (observations, time, space) for spatio-temporal clustering.
         delta = np.transpose(delta, (0, 2, 1))
 
-        with parallel_backend(backend):
-            T_obs, clusters, cluster_pvals, H0 = mne.stats.spatio_temporal_cluster_1samp_test(
+        # with parallel_backend(backend):
+        T_obs, clusters, cluster_pvals, H0 = mne.stats.spatio_temporal_cluster_1samp_test(
                 delta,
                 adjacency=adjacency,
                 n_permutations=2000,
