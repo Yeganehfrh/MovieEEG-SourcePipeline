@@ -1,4 +1,5 @@
 import os
+import gc
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
@@ -22,9 +23,9 @@ def _get_n_jobs():
 
 
 if __name__ == "__main__":
-    X_by_condition = {
-        "lin": _load_npz_array("data/stcs_aggregated/X_lin.npz"),
-        "scr": _load_npz_array("data/stcs_aggregated/X_scr.npz"),
+    condition_paths = {
+        "lin": "data/stcs_aggregated/X_lin.npz",
+        "scr": "data/stcs_aggregated/X_scr.npz",
     }
 
     with np.load("data/stcs_aggregated/meta.npz") as meta:
@@ -47,7 +48,8 @@ if __name__ == "__main__":
 
     adjacency = mne.spatio_temporal_src_adjacency(src, n_times=int(pmask.sum()))
 
-    for condition, X_cond in X_by_condition.items():
+    for condition, path in condition_paths.items():
+        X_cond = _load_npz_array(path)
         base_mag = np.mean(np.abs(X_cond[:, :, bmask]), axis=2)  # (n_subjects, n_vertices)
         post_mag = np.abs(X_cond[:, :, pmask])  # (n_subjects, n_vertices, n_times)
         delta = post_mag - base_mag[:, :, np.newaxis]
@@ -76,3 +78,6 @@ if __name__ == "__main__":
             cluster_p_values=cluster_pvals,
             H0=H0,
         )
+
+        del X_cond, base_mag, post_mag, delta, T_obs, clusters, cluster_pvals, H0
+        gc.collect()
