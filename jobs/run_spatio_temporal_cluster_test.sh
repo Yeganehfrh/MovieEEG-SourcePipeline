@@ -13,7 +13,7 @@
 #SBATCH --mail-user=y.farahzadi@gmail.com
 
 export MNE_NUM_JOBS=1
-export JOBLIB_BACKEND=loky
+# export JOBLIB_BACKEND=loky
 export CLUSTER_TIME_DECIM=1
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
