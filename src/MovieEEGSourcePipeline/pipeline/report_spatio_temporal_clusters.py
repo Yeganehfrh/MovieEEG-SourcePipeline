@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -301,6 +302,18 @@ def _save_binned_brain_maps(
         brain.close()
 
 
+def _configure_3d_backend(offscreen: bool):
+    # Use non-Qt backend in headless environments (e.g., HPC login/compute nodes).
+    mne.viz.set_3d_backend("pyvista")
+    if offscreen:
+        os.environ["PYVISTA_OFF_SCREEN"] = "true"
+        try:
+            import pyvista as pv
+            pv.OFF_SCREEN = True
+        except Exception:
+            pass
+
+
 def main():
     parser = argparse.ArgumentParser(description="Report significant spatio-temporal clusters.")
     parser.add_argument("--results-root", type=Path, default=Path("results"))
@@ -313,6 +326,7 @@ def main():
     parser.add_argument("--parc", type=str, default="aparc")
     parser.add_argument("--bin-ms", type=int, default=50)
     parser.add_argument("--make-brain-plots", action="store_true")
+    parser.add_argument("--offscreen", action="store_true")
     args = parser.parse_args()
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
@@ -328,6 +342,7 @@ def main():
         parc=args.parc,
         vertices=vertices,
     )
+    _configure_3d_backend(offscreen=args.offscreen)
 
     all_rows = []
     for condition in args.conditions:
