@@ -63,8 +63,8 @@ if __name__ == "__main__":
 
     for condition, path in condition_paths.items():
         X_cond = _load_npz_array(path)
-        base_mag = np.mean(np.abs(X_cond[:, :, bmask]), axis=2)  # (n_subjects, n_vertices)
-        post_mag = np.abs(X_cond[:, :, pmask])  # (n_subjects, n_vertices, n_times)
+        base_mag = np.mean(X_cond[:, :, bmask], axis=2)  # (n_subjects, n_vertices)
+        post_mag = X_cond[:, :, pmask]  # (n_subjects, n_vertices, n_times)
         if time_decim > 1:
             post_mag = post_mag[:, :, ::time_decim]
         delta = post_mag - base_mag[:, :, np.newaxis]
@@ -77,7 +77,7 @@ if __name__ == "__main__":
                     delta,
                     adjacency=adjacency,
                     n_permutations=2000,
-                    tail=1,
+                    tail=0,
                     n_jobs=n_jobs,
                     threshold=None,
                     out_type="indices",
@@ -87,7 +87,7 @@ if __name__ == "__main__":
         results_dir = Path(f"results/spatio_temporal_cluster_test_{condition}")
         results_dir.mkdir(parents=True, exist_ok=True)
         np.savez_compressed(
-            results_dir / "cluster_test_results.npz",
+            results_dir / "cluster_test_results_signed_data.npz",
             T_obs=T_obs,
             clusters=np.array(clusters, dtype=object),
             cluster_p_values=cluster_pvals,
