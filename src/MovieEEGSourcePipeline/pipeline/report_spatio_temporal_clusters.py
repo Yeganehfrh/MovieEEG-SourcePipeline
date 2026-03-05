@@ -17,7 +17,7 @@ def _get_time_decim(results_npz) -> int:
 
 
 def _load_condition_results(results_root: Path, condition: str):
-    path = results_root / f"spatio_temporal_cluster_test_{condition}" / "cluster_test_results.npz"
+    path = results_root / f"spatio_temporal_cluster_test_{condition}" / "cluster_test_results_signed_data.npz"
     if not path.exists():
         raise FileNotFoundError(f"Missing results for condition '{condition}': {path}")
 
