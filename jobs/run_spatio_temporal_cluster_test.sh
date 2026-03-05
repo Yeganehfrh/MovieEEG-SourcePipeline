@@ -6,7 +6,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=128
-#SBATCH --time=00:20:00
+#SBATCH --time=01:00:00
 #SBATCH --output=/mnt/aiongpfs/users/mansarinia/MovieEEG-SourcePipeline/logs/cluster_%j.log
 #SBATCH --error=/mnt/aiongpfs/users/mansarinia/MovieEEG-SourcePipeline/logs/cluster_%j.log
 #SBATCH --mail-type=ALL

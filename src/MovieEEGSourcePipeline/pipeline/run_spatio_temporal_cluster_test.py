@@ -9,6 +9,7 @@ from pathlib import Path
 # from joblib import parallel_backend
 
 import numpy as np
+from scipy.stats import t
 import mne
 
 
@@ -72,6 +73,10 @@ if __name__ == "__main__":
         # MNE expects (observations, time, space) for spatio-temporal clustering.
         delta = np.transpose(delta, (0, 2, 1))
 
+        # specify threshold
+        df = delta.shape[0] - 1
+        t_threshold = t.ppf(1 - 0.001 / 2, df)
+
         # with parallel_backend(backend):
         T_obs, clusters, cluster_pvals, H0 = mne.stats.spatio_temporal_cluster_1samp_test(
                 delta,
@@ -79,7 +84,7 @@ if __name__ == "__main__":
                 n_permutations=2000,
                 tail=0,
                 n_jobs=n_jobs,
-                threshold=None,
+                threshold=t_threshold,
                 out_type="indices",
                 verbose=True,
             )
