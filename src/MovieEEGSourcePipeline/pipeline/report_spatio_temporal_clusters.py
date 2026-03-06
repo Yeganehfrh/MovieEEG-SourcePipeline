@@ -75,7 +75,7 @@ def _labels_for_cluster_vertices(unique_global_vertices, n_lh_vertices: int, ver
 
 def _top_label_string(label_counts: dict[str, int], n_vertices: int, top_k: int = 3):
     if not label_counts or n_vertices == 0:
-        return ""
+        return "unknown (the top vertices are not covered by any label in the DK atlas)"
     parts = []
     top = sorted(label_counts.items(), key=lambda kv: kv[1], reverse=True)[:top_k]
     for name, count in top:
@@ -128,7 +128,7 @@ def _summarize_condition(
 
         peak_hemi, peak_vertex_no = _global_to_hemi_vertex(peak_vertex, n_lh_vertices, vertices)
         peak_label_candidates = atlas_maps[peak_hemi].get(peak_vertex_no, [])
-        peak_label = peak_label_candidates[0] if peak_label_candidates else ""
+        peak_label = peak_label_candidates[0] if peak_label_candidates else "unknown"
 
         label_counts = _labels_for_cluster_vertices(uniq_vertices, n_lh_vertices, vertices, atlas_maps)
         top_labels = _top_label_string(label_counts, int(uniq_vertices.size))
@@ -242,7 +242,7 @@ def _plot_top_vertices_heatmap(
 
 def _vertex_display_label(global_vertex_idx: int, n_lh_vertices: int, vertices, atlas_maps) -> str:
     hemi, hemi_vertex = _global_to_hemi_vertex(global_vertex_idx, n_lh_vertices, vertices)
-    labels = atlas_maps[hemi].get(hemi_vertex, [])
+    labels = atlas_maps[hemi].get(hemi_vertex, [])[:-3]  # remove the last 3 hemi character
     if labels:
         return f"{hemi}:{labels[0]}"
     return f"{hemi}:unknown"
@@ -289,6 +289,7 @@ def _plot_label_time_heatmap(
     )
     tick_positions = np.linspace(0, len(times_post) - 1, 6, dtype=int)
     plt.xticks(tick_positions + 0.5, [f"{times_post[i]:.2f}" for i in tick_positions], rotation=0)
+    plt.yticks(size=14)
     plt.xlabel("Time (s)")
     plt.ylabel("Atlas label")
     plt.title("T_obs by Atlas Label (Significant Vertices)")
