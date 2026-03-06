@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
 
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import mne
 import numpy as np
@@ -296,93 +297,6 @@ def _plot_label_time_heatmap(
     plt.close()
 
 
-def _save_binned_brain_maps(
-    sig_mask: np.ndarray,
-    times_post: np.ndarray,
-    vertices: np.ndarray,
-    fs_subject: str,
-    subjects_dir: Path,
-    out_dir: Path,
-    bin_ms: int,
-    sign_name: str,
-):
-    if not np.any(sig_mask):
-        return
-
-    out_dir.mkdir(parents=True, exist_ok=True)
-    bin_sec = bin_ms / 1000.0
-    t_min = float(times_post.min())
-    t_max = float(times_post.max())
-    edges = np.arange(t_min, t_max + bin_sec + 1e-12, bin_sec)
-
-    lh_vertices = np.asarray(vertices[0], dtype=int)
-    rh_vertices = np.asarray(vertices[1], dtype=int)
-
-    for b0, b1 in zip(edges[:-1], edges[1:]):
-        tmask = (times_post >= b0) & (times_post < b1)
-        if not np.any(tmask):
-            continue
-
-        occ = sig_mask[tmask].mean(axis=0)
-        if np.max(occ) <= 0:
-            continue
-
-        stc = mne.SourceEstimate(
-            data=occ[:, np.newaxis],
-            vertices=[lh_vertices, rh_vertices],
-            tmin=0.0,
-            tstep=1.0,
-            subject=fs_subject,
-        )
-
-        vmin = float(np.percentile(occ[occ > 0], 5))
-        vmax = float(np.percentile(occ[occ > 0], 99))
-        if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin <= 0 or vmax <= 0:
-            vmin, vmax = 0.05, 1.0
-        if vmax <= vmin:
-            vmax = min(1.0, vmin + 0.05)
-
-        brain = stc.plot(
-            subject=fs_subject,
-            subjects_dir=str(subjects_dir),
-            hemi="split",
-            views=["lat", "med"],
-            surface="inflated",
-            colormap="Reds" if sign_name == "pos" else "Blues",
-            background="white",
-            colorbar=True,
-            time_viewer=False,
-            clim=dict(kind="value", lims=[vmin, 0.5 * (vmin + vmax), vmax]),
-            size=(1600, 900),
-            smoothing_steps=5,
-        )
-
-        tag = f"{int(round(b0 * 1000)):04d}_{int(round(b1 * 1000)):04d}ms"
-        out_png = out_dir / f"{sign_name}_sig_vertices_{tag}.png"
-        brain.save_image(str(out_png))
-        brain.close()
-
-
-def _configure_3d_backend(offscreen: bool):
-    # Use non-Qt backend in headless environments (e.g., HPC login/compute nodes).
-    os.environ.setdefault("MNE_3D_BACKEND", "pyvista")
-    if offscreen:
-        os.environ.setdefault("PYVISTA_OFF_SCREEN", "true")
-        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-        try:
-            import pyvista as pv
-            pv.OFF_SCREEN = True
-            # If no OpenGL display is available, xvfb can provide a virtual one.
-            if "DISPLAY" not in os.environ:
-                try:
-                    pv.start_xvfb(wait=0.1)
-                except Exception:
-                    pass
-        except Exception:
-            pass
-    mne.viz.set_3d_backend("pyvista")
-
-
 def main():
     parser = argparse.ArgumentParser(description="Report significant spatio-temporal clusters.")
     parser.add_argument("--results-root", type=Path, default=Path("results"))
@@ -393,9 +307,6 @@ def main():
     parser.add_argument("--subjects-dir", type=Path, default=Path("data"))
     parser.add_argument("--fs-subject", type=str, default="fsaverage")
     parser.add_argument("--parc", type=str, default="aparc")
-    parser.add_argument("--bin-ms", type=int, default=50)
-    parser.add_argument("--make-brain-plots", action="store_true")
-    parser.add_argument("--offscreen", action="store_true")
     args = parser.parse_args()
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
@@ -411,7 +322,6 @@ def main():
         parc=args.parc,
         vertices=vertices,
     )
-    _configure_3d_backend(offscreen=args.offscreen)
 
     all_rows = []
     for condition in args.conditions:
@@ -465,31 +375,6 @@ def main():
                 atlas_maps=atlas_maps,
                 out_png=cond_out / "label_time_heatmap.png",
             )
-            if args.make_brain_plots:
-                try:
-                    _save_binned_brain_maps(
-                        sig_mask=sig_mask_pos,
-                        times_post=times_post,
-                        vertices=vertices,
-                        fs_subject=args.fs_subject,
-                        subjects_dir=args.subjects_dir,
-                        out_dir=cond_out / "brain_bins",
-                        bin_ms=args.bin_ms,
-                        sign_name="pos",
-                    )
-                    _save_binned_brain_maps(
-                        sig_mask=sig_mask_neg,
-                        times_post=times_post,
-                        vertices=vertices,
-                        fs_subject=args.fs_subject,
-                        subjects_dir=args.subjects_dir,
-                        out_dir=cond_out / "brain_bins",
-                        bin_ms=args.bin_ms,
-                        sign_name="neg",
-                    )
-                except Exception as exc:
-                    print(f"[{condition}] brain plotting skipped due to error: {exc}")
-
         all_rows.append(summary)
 
     all_summary = pd.concat(all_rows, ignore_index=True) if all_rows else pd.DataFrame()
