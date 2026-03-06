@@ -184,7 +184,7 @@ def _plot_time_coverage(
     out_png: Path,
 ):
     n_sig_vertices = sig_mask.sum(axis=1)
-    max_abs_t_sig = np.where(sig_mask, np.abs(t_obs), np.nan)
+    max_t_sig = np.where(sig_mask, t_obs, np.nan)
     with np.errstate(invalid="ignore"):
         max_abs_t_sig = np.nanmax(max_abs_t_sig, axis=1)
     max_abs_t_sig = np.where(np.isfinite(max_abs_t_sig), max_abs_t_sig, 0.0)
@@ -242,9 +242,9 @@ def _plot_top_vertices_heatmap(
 
 def _vertex_display_label(global_vertex_idx: int, n_lh_vertices: int, vertices, atlas_maps) -> str:
     hemi, hemi_vertex = _global_to_hemi_vertex(global_vertex_idx, n_lh_vertices, vertices)
-    labels = atlas_maps[hemi].get(hemi_vertex, [])[:-3]  # remove the last 3 hemi character
+    labels = atlas_maps[hemi].get(hemi_vertex, [])
     if labels:
-        return f"{hemi}:{labels[0]}"
+        return f"{hemi}:{labels[0][:-3]}" # remove the last 3 hemi character
     return f"{hemi}:unknown"
 
 
