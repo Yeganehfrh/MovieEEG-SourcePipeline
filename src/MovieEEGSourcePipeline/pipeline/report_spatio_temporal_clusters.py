@@ -186,8 +186,8 @@ def _plot_time_coverage(
     n_sig_vertices = sig_mask.sum(axis=1)
     max_t_sig = np.where(sig_mask, t_obs, np.nan)
     with np.errstate(invalid="ignore"):
-        max_abs_t_sig = np.nanmax(max_abs_t_sig, axis=1)
-    max_abs_t_sig = np.where(np.isfinite(max_abs_t_sig), max_abs_t_sig, 0.0)
+        max_t_sig = np.nanmax(max_t_sig, axis=1)
+    max_t_sig = np.where(np.isfinite(max_t_sig), max_t_sig, 0.0)
 
     fig, ax1 = plt.subplots(figsize=(10, 4.5))
     ax1.plot(times_post, n_sig_vertices, color="#1b5e20", lw=2)
@@ -196,8 +196,8 @@ def _plot_time_coverage(
     ax1.tick_params(axis="y", labelcolor="#1b5e20")
 
     ax2 = ax1.twinx()
-    ax2.plot(times_post, max_abs_t_sig, color="#c62828", lw=1.5, alpha=0.8)
-    ax2.set_ylabel("Max |T_obs| within significant mask", color="#c62828")
+    ax2.plot(times_post, max_t_sig, color="#c62828", lw=1.5, alpha=0.8)
+    ax2.set_ylabel("Max T_obs within significant mask", color="#c62828")
     ax2.tick_params(axis="y", labelcolor="#c62828")
 
     ax1.set_title("Temporal Coverage of Significant Clusters")
