@@ -112,6 +112,8 @@ def _summarize_condition(
         uniq_times = np.unique(time_inds)
         uniq_vertices = np.unique(vertex_inds)
         cluster_t = t_obs[time_inds, vertex_inds]
+        n_pos_points = int(np.sum(cluster_t > 0))
+        n_neg_points = int(np.sum(cluster_t < 0))
         peak_local = int(np.argmax(np.abs(cluster_t)))
         peak_time_idx = int(time_inds[peak_local])
         peak_vertex = int(vertex_inds[peak_local])
@@ -137,6 +139,8 @@ def _summarize_condition(
                 "cluster_rank": int(rank),
                 "p_value": float(cluster_p_values[cid]),
                 "n_points": int(time_inds.size),
+                "n_pos_points": n_pos_points,
+                "n_neg_points": n_neg_points,
                 "n_timepoints": int(uniq_times.size),
                 "n_vertices": int(uniq_vertices.size),
                 "t_start_sec": float(times_post[uniq_times.min()]),
@@ -235,6 +239,63 @@ def _plot_top_vertices_heatmap(
     plt.close()
 
 
+def _vertex_display_label(global_vertex_idx: int, n_lh_vertices: int, vertices, atlas_maps) -> str:
+    hemi, hemi_vertex = _global_to_hemi_vertex(global_vertex_idx, n_lh_vertices, vertices)
+    labels = atlas_maps[hemi].get(hemi_vertex, [])
+    if labels:
+        return f"{hemi}:{labels[0]}"
+    return f"{hemi}:unknown"
+
+
+def _plot_label_time_heatmap(
+    t_obs: np.ndarray,
+    sig_mask: np.ndarray,
+    times_post: np.ndarray,
+    vertices: np.ndarray,
+    n_lh_vertices: int,
+    atlas_maps: dict,
+    out_png: Path,
+    max_labels: int = 30,
+):
+    sig_per_vertex = sig_mask.sum(axis=0)
+    sig_vertices = np.where(sig_per_vertex > 0)[0]
+    if sig_vertices.size == 0:
+        return
+
+    label_to_vertices: dict[str, list[int]] = {}
+    for gidx in sig_vertices:
+        label = _vertex_display_label(int(gidx), n_lh_vertices, vertices, atlas_maps)
+        label_to_vertices.setdefault(label, []).append(int(gidx))
+
+    label_scores = {
+        label: int(sig_mask[:, vidxs].sum())
+        for label, vidxs in label_to_vertices.items()
+    }
+    sorted_labels = sorted(label_scores, key=label_scores.get, reverse=True)[:max_labels]
+    if not sorted_labels:
+        return
+
+    hm = np.vstack([t_obs[:, label_to_vertices[label]].mean(axis=1) for label in sorted_labels])
+
+    plt.figure(figsize=(12, max(5, 0.35 * len(sorted_labels))))
+    sns.heatmap(
+        hm,
+        cmap="RdBu_r",
+        center=0.0,
+        cbar_kws={"label": "Mean T_obs"},
+        xticklabels=False,
+        yticklabels=sorted_labels,
+    )
+    tick_positions = np.linspace(0, len(times_post) - 1, 6, dtype=int)
+    plt.xticks(tick_positions + 0.5, [f"{times_post[i]:.2f}" for i in tick_positions], rotation=0)
+    plt.xlabel("Time (s)")
+    plt.ylabel("Atlas label")
+    plt.title("T_obs by Atlas Label (Significant Vertices)")
+    plt.tight_layout()
+    plt.savefig(out_png, dpi=180)
+    plt.close()
+
+
 def _save_binned_brain_maps(
     sig_mask: np.ndarray,
     times_post: np.ndarray,
@@ -304,14 +365,22 @@ def _save_binned_brain_maps(
 
 def _configure_3d_backend(offscreen: bool):
     # Use non-Qt backend in headless environments (e.g., HPC login/compute nodes).
-    mne.viz.set_3d_backend("pyvista")
+    os.environ.setdefault("MNE_3D_BACKEND", "pyvista")
     if offscreen:
-        os.environ["PYVISTA_OFF_SCREEN"] = "true"
+        os.environ.setdefault("PYVISTA_OFF_SCREEN", "true")
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         try:
             import pyvista as pv
             pv.OFF_SCREEN = True
+            # If no OpenGL display is available, xvfb can provide a virtual one.
+            if "DISPLAY" not in os.environ:
+                try:
+                    pv.start_xvfb(wait=0.1)
+                except Exception:
+                    pass
         except Exception:
             pass
+    mne.viz.set_3d_backend("pyvista")
 
 
 def main():
@@ -386,6 +455,15 @@ def main():
                 sig_mask=sig_mask,
                 times_post=times_post,
                 out_png=cond_out / "top_significant_vertices_heatmap.png",
+            )
+            _plot_label_time_heatmap(
+                t_obs=t_obs,
+                sig_mask=sig_mask,
+                times_post=times_post,
+                vertices=vertices,
+                n_lh_vertices=n_lh_vertices,
+                atlas_maps=atlas_maps,
+                out_png=cond_out / "label_time_heatmap.png",
             )
             if args.make_brain_plots:
                 try:
